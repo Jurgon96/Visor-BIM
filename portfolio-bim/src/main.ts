@@ -228,4 +228,6 @@ const [panel, updatePanel] = BUI.Component.create<BUI.PanelSection, {}>((_) => {
 
 onItemSelected = () => updatePanel();
 
-document.body.append(panel);
+const propiedades = document.getElementById("propiedades")!;
+
+propiedades.append(panel);

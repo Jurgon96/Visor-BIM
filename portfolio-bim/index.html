@@ -6,8 +6,16 @@
   <title>BIM Viewer</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; }
-    #viewer { width: 50%; height: 50%; }
-    #propiedades {width: 50%; height:50%; }
+    #viewer { width: 100%; height: 100%; }
+    #app {
+      width: 100%;
+      height: 80%;
+      display:flex;
+    }
+    #propiedades {
+      width: 50%;
+      height: 100%;
+    }
     #toolbar{
       position: fixed;
       top: 10px; left: 10px;
@@ -22,11 +30,14 @@
   <div id="toolbar">
     <button id="btnLoad">Cargar IFC demo</button>
   </div>
+  <div id="app">
+    <div id ="viewer">
 
-  <div id="viewer">
-    
+    </div>
+    <div id="propiedades">
+
+    </div>
   </div>
-  
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
