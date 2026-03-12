@@ -63,6 +63,7 @@ const workerFile = new File([workerBlob], "worker.mjs", {
 const workerUrl = URL.createObjectURL(workerFile);
 const fragments = components.get(OBC.FragmentsManager);
 fragments.init(workerUrl);
+const classifier = components.get(OBC.Classifier);
 
 world.camera.controls.addEventListener("update", () => fragments.core.update());
 
@@ -102,6 +103,20 @@ const demoIfc =
 await loadIfcFromUrl(demoIfc);
 console.log("IFC demo solicitado");
 
+/**
+ *! USO de CLASSIFIERS
+ */
+// Crea automáticamente grupos por categoría IFC. Eso permitirá tener cosas como muros, losas, puertas, ventanas, etc., agrupadas por tipo.
+await classifier.byCategory();
+// Crea automáticamente grupos por planta/nivel
+await classifier.byIfcBuildingStorey({ classificationName: "Levels" });
+
+console.log("Clasificación por categoría y por plantas creada");
+console.log(classifier.list);
+
+
+
+// ----------------------------------------------------------------------------------------
 // Using The Raycasters Component
 // El lanzamiento de rayos consiste en proyectar un rayo desde un punto a otro en el espacio. 
 // Lanzaremos un rayo desde la posición del ratón al mundo 3D y comprobaremos si hay algún objeto en su camino.
@@ -226,6 +241,7 @@ const [panel, updatePanel] = BUI.Component.create<BUI.PanelSection, {}>((_) => {
   `;
 }, {});
 
+// Cuando seleccionas un elemento vuelve a renderizar el panel con updatePanel()
 onItemSelected = () => updatePanel();
 
 const propiedades = document.getElementById("propiedades")!;
