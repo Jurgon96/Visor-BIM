@@ -64,6 +64,7 @@ const workerUrl = URL.createObjectURL(workerFile);
 const fragments = components.get(OBC.FragmentsManager);
 fragments.init(workerUrl);
 const classifier = components.get(OBC.Classifier);
+const hider = components.get(OBC.Hider);
 
 world.camera.controls.addEventListener("update", () => fragments.core.update());
 
@@ -107,12 +108,126 @@ console.log("IFC demo solicitado");
  *! USO de CLASSIFIERS
  */
 // Crea automáticamente grupos por categoría IFC. Eso permitirá tener cosas como muros, losas, puertas, ventanas, etc., agrupadas por tipo.
-await classifier.byCategory();
-// Crea automáticamente grupos por planta/nivel
-await classifier.byIfcBuildingStorey({ classificationName: "Levels" });
+const addDefaultGroupings = async () => {
+  await classifier.byCategory();
+  await classifier.byIfcBuildingStorey({ classificationName: "Levels" });
+};
 
 console.log("Clasificación por categoría y por plantas creada");
 console.log(classifier.list);
+// Si BUI.Manager.init() no se ejecuta , el navegador solo ve <bim-table> como un HTML normal:
+BUI.Manager.init()
+console.log("Modelos fragmentados cargados:", [...fragments.list.keys()]);
+console.log("Fragments list:", fragments.list);
+
+
+
+type GroupsTableData = {
+  Classification: string;
+  Name: string;
+  Actions: string;
+};
+
+interface GroupsTableState {
+  components: OBC.Components;
+}
+
+const groupsTableTemplate = (_state: GroupsTableState) => {
+  const onCreated = (e?: Element) => {
+    if (!e) return;
+    const table = e as BUI.Table<GroupsTableData>;
+
+    table.loadFunction = async () => {
+      const data: BUI.TableGroupData<GroupsTableData>[] = [];
+
+      for (const [classification, groups] of classifier.list) {
+        for (const [name] of groups) {
+          data.push({
+            data: { Name: name, Classification: classification, Actions: "" },
+          });
+        }
+      }
+
+      return data;
+    };
+
+    table.loadData(true);
+  };
+
+  return BUI.html`
+    <bim-table ${BUI.ref(onCreated)}></bim-table>
+  `;
+};
+
+const [groupsTable, updateTable] = BUI.Component.create<
+  BUI.Table<GroupsTableData>,
+  GroupsTableState
+>(groupsTableTemplate, {
+  components,
+});
+/*
+maxHeight -> Limita la altura visual de la tabla
+hiddenColumns = ["Classification"] -> Oculta la columna Classification
+noIndentation = true -> Evita sangrías visuales
+headersHidden = true -> Oculta la cabecera de la tabla
+*/
+groupsTable.style.maxHeight = "25rem";
+groupsTable.hiddenColumns = ["Classification"];
+groupsTable.columns = ["Name", { name: "Actions", width: "auto" }];
+groupsTable.noIndentation = true;
+groupsTable.headersHidden = true;
+// Aquí es donde por fin el visor se actualiza dinámicamente. 
+// Se está igualando 'groupsTable.dataTransform' a un objeto JavaScript cuyas claves son nombres de columnas y cuyos valores son funciones que transforman el contenido de esa columna.
+groupsTable.dataTransform = {
+  Actions: (_, rowData) => {
+    const { Name, Classification } = rowData;
+    if (!(Name && Classification)) return _;
+    const classification = classifier.list.get(Classification);
+    if (!classification) return _;
+    const groupData = classification.get(Name);
+    if (!groupData) return _;
+
+    const hider = components.get(OBC.Hider);
+    const onClick = async ({ target }: { target: BUI.Button }) => {
+      target.loading = true;
+      // Devuelve el conjunto real de elementos de ese grupo.
+      const modelIdMap = await groupData.get();
+      // Oculta todo menos esos elementos.
+      await hider.isolate(modelIdMap);
+      target.loading = false;
+    };
+
+    return BUI.html`<bim-button icon="solar:cursor-bold" @click=${onClick}></bim-button>`;
+  },
+};
+// Cuando el classifier añade nuevas clasificaciones o grupos, la tabla se refresca.
+classifier.list.onItemSet.add(() => setTimeout(() => updateTable()));
+// Crear el panel principal del tutorial
+const panelClassifier = BUI.Component.create<BUI.PanelSection>(() => {
+  const onResetVisibility = async ({ target }: { target: BUI.Button }) => {
+    target.loading = true;
+    const hider = components.get(OBC.Hider);
+    await hider.set(true);
+    target.loading = false;
+  };
+
+  const onAddDefaults = async () => {
+    await addDefaultGroupings();
+  };
+
+  return BUI.html`
+    <bim-panel active label="Classifier Tutorial" class="options-menu">
+      <bim-panel-section style="min-width: 14rem" label="General">
+        <bim-button label="Reset Visibility" @click=${onResetVisibility}></bim-button>
+      </bim-panel-section>
+      <bim-panel-section label="Groupings">
+        <bim-button label="Add Defaults" @click=${onAddDefaults}></bim-button>
+        ${groupsTable}
+      </bim-panel-section>
+    </bim-panel>
+  `;
+});
+
 
 
 
@@ -208,8 +323,6 @@ onSelectCallback = async (modelIdMap) => {
  *! IMPLEMENTACION DE INTERFAZ GRAFICA PARA SELECCION
  */
 
-BUI.Manager.init();
-
 const [panel, updatePanel] = BUI.Component.create<BUI.PanelSection, {}>((_) => {
   const onColorChange = ({ target }: { target: BUI.ColorInput }) => {
     color.set(target.color);
@@ -247,3 +360,4 @@ onItemSelected = () => updatePanel();
 const propiedades = document.getElementById("propiedades")!;
 
 propiedades.append(panel);
+propiedades.append(panelClassifier);
